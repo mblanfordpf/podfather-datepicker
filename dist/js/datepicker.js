@@ -458,16 +458,15 @@ var Datepicker = (function () {
     };
   }
 
-  function findFromPath(path, criteria, currentTarget) {
-    const [node, ...rest] = path;
-    if (criteria(node)) {
-      return node;
-    }
-    if (node === currentTarget || node.tagName === 'HTML' || rest.length === 0) {
+  function findFromPath(path, criteria, currentTarget, index = 0) {
+    const el = path[index];
+    if (criteria(el)) {
+      return el;
+    } else if (el === currentTarget || !el.parentElement) {
       // stop when reaching currentTarget or <html>
       return;
     }
-    return findFromPath(rest, criteria, currentTarget);
+    return findFromPath(path, criteria, currentTarget, index + 1);
   }
 
   // Search for the actual target of a delegated event
@@ -823,32 +822,32 @@ var Datepicker = (function () {
   }
 
   const pickerTemplate = optimizeTemplateHTML(`<div class="datepicker hidden font-body">
-  <div class="datepicker-picker inline-block rounded-lg bg-white shadow-lg w-full">
+  <div class="datepicker-picker inline-block rounded-lg bg-white shadow-lg p-4 w-full">
     <div class="datepicker-header">
-      <div class="datepicker-title shadow-lg bg-white px-1.5 py-3 text-center"></div>
-      <div class="datepicker-controls rounded-lg border-none text-neutral-500 font-medium bg-white flex items-center justify-center text-sm py-5">
-        <button type="button" class="%buttonClass% border-none hover:bg-neutral-50 pr-1.5 pl-1.5 w-9 prev-btn"></button>
+      <div class="datepicker-title bg-white px-2 py-3 text-center font-semibold"></div>
+      <div class="datepicker-controls flex justify-between mb-2">
+        <button type="button" class="bg-white rounded-lg text-neutral-700 hover:bg-neutral-50 text-lg p-2.5 prev-btn"></button>
         <button type="button" class="%buttonClass% border-none view-switch text-md pointer-events-none"></button>
-        <button type="button" class="%buttonClass% border-none hover:bg-neutral-50 pr-1.5 pl-1.5 w-9 next-btn"></button>
+        <button type="button" class="bg-white rounded-lg text-neutral-700 hover:bg-neutral-50 text-lg p-2.5 next-btn"></button>
       </div>
     </div>
-    <div class="datepicker-main"></div>
+    <div class="datepicker-main p-1"></div>
     <div class="datepicker-footer">
-      <div class="datepicker-controls rounded-lg border-none text-neutral-500 font-medium bg-white flex items-center justify-center text-sm">
+      <div class="datepicker-controls flex space-x-2 mt-2">
         <button type="button" class="%buttonClass% today-btn bg-white border border-neutral-300 rounded-lg font-body text-sm m-2 space-x-2 px-4 py-2 min-w-max font-medium text-neutral-700 hover:bg-neutral-50 tracking-wider cursor-pointer disabled:cursor-default"></button>
-        <button type="button" class="%buttonClass% clear-btn rounded-lg font-body text-sm m-2 space-x-2 px-4 py-2 min-w-max font-medium text-neutral-700 hover:bg-neutral-50 tracking-wider cursor-pointer disabled:cursor-default"></button>
+        <button type="button" class="%buttonClass% clear-btn bg-white border border-neutral-300 rounded-lg font-body text-sm m-2 space-x-2 px-4 py-2 min-w-max font-medium text-neutral-700 hover:bg-neutral-50 tracking-wider cursor-pointer disabled:cursor-default"></button>
       </div>
     </div>
   </div>
 </div>`);
 
   const daysTemplate = optimizeTemplateHTML(`<div class="days">
-  <div class="days-of-week mb-2">${createTagRepeat('span', 7, {class: 'dow'})}</div>
-  <div class="datepicker-grid">${createTagRepeat('span', 42)}</div>
+  <div class="days-of-week grid grid-cols-7 mb-1">${createTagRepeat('span', 7, {class: 'dow block flex-1 leading-9 border-0 rounded-lg cursor-default text-center text-neutral-700 font-semibold text-sm'})}</div>
+  <div class="datepicker-grid w-64 grid grid-cols-7">${createTagRepeat('span', 42 , {class: 'block flex-1 leading-9 border-0 rounded-lg cursor-default text-center text-neutral-700 font-medium text-sm h-6'})}</div>
 </div>`);
 
   const calendarWeeksTemplate = optimizeTemplateHTML(`<div class="calendar-weeks">
-  <div class="days-of-week"><span class="dow text-neutral-500 font-medium bg-white"></span></div>
+  <div class="days-of-week"><span class="dow"></span></div>
   <div class="weeks">${createTagRepeat('span', 6, {class: 'week'})}</div>
 </div>`);
 
@@ -857,7 +856,7 @@ var Datepicker = (function () {
     constructor(picker, config) {
       Object.assign(this, config, {
         picker,
-        element: parseHTML(`<div class="datepicker-view pt-2"></div>`).firstChild,
+        element: parseHTML(`<div class="datepicker-view flex"></div>`).firstChild,
         selected: [],
       });
       this.init(this.picker.datepicker.config);
@@ -981,7 +980,7 @@ var Datepicker = (function () {
       if (typeof options.getCalendarWeek === 'function') {
         this.getCalendarWeek = options.getCalendarWeek;
       }
-
+      
       if (options.showDaysOfWeek !== undefined) {
         if (options.showDaysOfWeek) {
           showElement(this.dow);
@@ -994,6 +993,10 @@ var Datepicker = (function () {
             hideElement(this.calendarWeeks.dow);
           }
         }
+      }
+      
+      if (options.theme) {
+        this.theme = options.theme
       }
 
       // update days-of-week when locale, daysOfweekDisabled or weekStart is changed
@@ -1063,23 +1066,23 @@ var Datepicker = (function () {
         const date = new Date(current);
         const day = date.getDay();
 
-        el.className = `datepicker-cell ${this.cellClass}`;
+        el.className = `datepicker-cell hover:bg-neutral-100 block flex-1 leading-9 border-0 rounded-full cursor-pointer text-center text-neutral-700 font-normal text-sm ${this.cellClass}`;
         el.dataset.date = current;
         el.textContent = date.getDate();
 
         if (current < this.first) {
-          classList.add('prev');
+          classList.add('prev', 'text-neutral-500');
         } else if (current > this.last) {
-          classList.add('next');
+          classList.add('next', 'text-neutral-500');
         }
         if (this.today === current) {
-          classList.add('today');
+          classList.add('today', 'bg-neutral-100');
         }
         if (current < this.minDate || current > this.maxDate || this.disabled.includes(current)) {
-          classList.add('disabled');
+          classList.add('disabled', 'cursor-not-allowed');
         }
         if (this.daysOfWeekDisabled.includes(day)) {
-          classList.add('disabled');
+          classList.add('disabled', 'cursor-not-allowed');
           pushUnique(this.disabled, current);
         }
         if (this.daysOfWeekHighlighted.includes(day)) {
@@ -1098,7 +1101,8 @@ var Datepicker = (function () {
           }
         }
         if (this.selected.includes(current)) {
-          classList.add(`selected bg-${options.theme}-400 rounded-full`);
+          classList.add('selected', `bg-${this.theme}-400`, `text-${this.theme}-800`);
+          classList.remove('text-neutral-700', 'text-neutral-500', 'hover:bg-neutral-100', 'bg-neutral-100')
         }
         if (current === this.focused) {
           classList.add('focused');
@@ -1116,7 +1120,8 @@ var Datepicker = (function () {
       this.grid
         .querySelectorAll('.range, .range-start, .range-end, .selected, .focused')
         .forEach((el) => {
-          el.classList.remove('range', 'range-start', 'range-end', 'selected', `bg-${options.theme}-400`, 'rounded-full', 'focused');
+          el.classList.remove('range', 'range-start', 'range-end', 'selected', `bg-${this.theme}-400`, `text-${this.theme}-800`, 'focused');
+          el.classList.add('text-neutral-700', 'rounded-lg');
         });
       Array.from(this.grid.children).forEach((el) => {
         const current = Number(el.dataset.date);
@@ -1131,7 +1136,8 @@ var Datepicker = (function () {
           classList.add('range-end');
         }
         if (this.selected.includes(current)) {
-          classList.add(`selected bg-${options.theme}-400 rounded-full`);
+          classList.add('selected', `bg-${this.theme}-400`, `text-${this.theme}-800`);
+          classList.remove('text-neutral-700', 'hover:bg-neutral-100', 'bg-neutral-100');
         }
         if (current === this.focused) {
           classList.add('focused');
@@ -1176,7 +1182,7 @@ var Datepicker = (function () {
     init(options, onConstruction = true) {
       if (onConstruction) {
         this.grid = this.element;
-        this.element.classList.add('months', 'datepicker-grid');
+        this.element.classList.add('months', 'datepicker-grid', 'w-64', 'grid', 'grid-cols-4');
         this.grid.appendChild(parseHTML(createTagRepeat('span', 12, {'data-month': ix => ix})));
       }
       super.init(options);
@@ -1253,7 +1259,6 @@ var Datepicker = (function () {
     render() {
       // refresh disabled months on every render in order to clear the ones added
       // by beforeShow hook at previous render
-      // this.disabled = [...this.datesDisabled];
       this.disabled = this.datesDisabled.reduce((arr, disabled) => {
         const dt = new Date(disabled);
         if (this.year === dt.getFullYear()) {
@@ -1261,7 +1266,6 @@ var Datepicker = (function () {
         }
         return arr;
       }, []);
-
       this.picker.setViewSwitchLabel(this.year);
       this.picker.setPrevBtnDisabled(this.year <= this.minYear);
       this.picker.setNextBtnDisabled(this.year >= this.maxYear);
@@ -1305,7 +1309,7 @@ var Datepicker = (function () {
           }
         }
         if (selected.includes(index)) {
-          classList.add(`selected bg-${options.theme}-400 rounded-full`);
+          classList.add('selected');
         }
         if (index === this.focused) {
           classList.add('focused');
@@ -1324,7 +1328,8 @@ var Datepicker = (function () {
       this.grid
         .querySelectorAll('.range, .range-start, .range-end, .selected, .focused')
         .forEach((el) => {
-          el.classList.remove('range', 'range-start', 'range-end', 'selected', `bg-${options.theme}-400`, 'rounded-full', 'focused');
+          el.classList.remove('range', 'range-start', 'range-end', 'selected', `bg-${this.theme}-400`, `text-${this.theme}-800`, 'focused');
+          el.classList.add('text-neutral-700', 'hover:bg-neutral-100');
         });
       Array.from(this.grid.children).forEach((el, index) => {
         const classList = el.classList;
@@ -1338,7 +1343,8 @@ var Datepicker = (function () {
           classList.add('range-end');
         }
         if (selected.includes(index)) {
-          classList.add(`selected bg-${options.theme}-400 rounded-full`);
+          classList.add('selected', `bg-${this.theme}-400`, `text-${this.theme}-800`);
+          classList.remove('text-neutral-700', 'hover:bg-neutral-100');
         }
         if (index === this.focused) {
           classList.add('focused');
@@ -1370,7 +1376,7 @@ var Datepicker = (function () {
         this.navStep = this.step * 10;
         this.beforeShowOption = `beforeShow${toTitleCase(this.cellClass)}`;
         this.grid = this.element;
-        this.element.classList.add(this.name, 'datepicker-grid');
+        this.element.classList.add(this.name, 'datepicker-grid', 'w-64', 'grid', 'grid-cols-4');
         this.grid.appendChild(parseHTML(createTagRepeat('span', 12)));
       }
       super.init(options);
@@ -1437,7 +1443,6 @@ var Datepicker = (function () {
     render() {
       // refresh disabled years on every render in order to clear the ones added
       // by beforeShow hook at previous render
-      // this.disabled = [...this.datesDisabled];
       this.disabled = this.datesDisabled.map(disabled => new Date(disabled).getFullYear());
 
       this.picker.setViewSwitchLabel(`${this.first}-${this.last}`);
@@ -1476,7 +1481,7 @@ var Datepicker = (function () {
           }
         }
         if (this.selected.includes(current)) {
-          classList.add(`selected bg-${options.theme}-400 rounded-full`);
+          classList.add('selected');
         }
         if (current === this.focused) {
           classList.add('focused');
@@ -1494,7 +1499,7 @@ var Datepicker = (function () {
       this.grid
         .querySelectorAll('.range, .range-start, .range-end, .selected, .focused')
         .forEach((el) => {
-          el.classList.remove('range', 'range-start', 'range-end', 'selected', `bg-${options.theme}-400`, 'rounded-full', 'focused');
+          el.classList.remove('range', 'range-start', 'range-end', 'selected', `bg-${this.theme}-400`, `text-${this.theme}-800`, 'focused');
         });
       Array.from(this.grid.children).forEach((el) => {
         const current = Number(el.textContent);
@@ -1509,7 +1514,8 @@ var Datepicker = (function () {
           classList.add('range-end');
         }
         if (this.selected.includes(current)) {
-          classList.add(`selected bg-${options.theme}-400 rounded-full`);
+          classList.add('selected', `bg-${this.theme}-400`, `text-${this.theme}-800`);
+          classList.remove('text-neutral-700', 'hover:bg-neutral-100');
         }
         if (current === this.focused) {
           classList.add('focused');
@@ -1753,9 +1759,9 @@ var Datepicker = (function () {
   // Class representing the picker UI
   class Picker {
     constructor(datepicker) {
-      const {config} = this.datepicker = datepicker;
+      this.datepicker = datepicker;
 
-      const template = pickerTemplate.replace(/%buttonClass%/g, config.buttonClass);
+      const template = pickerTemplate.replace(/%buttonClass%/g, datepicker.config.buttonClass);
       const element = this.element = parseHTML(template).firstChild;
       const [header, main, footer] = element.firstChild.children;
       const title = header.firstElementChild;
@@ -1774,8 +1780,9 @@ var Datepicker = (function () {
 
       const elementClass = datepicker.inline ? 'inline' : 'dropdown';
       element.classList.add(`datepicker-${elementClass}`);
+      elementClass === 'dropdown' ? element.classList.add('dropdown', 'absolute', 'top-0', 'left-0', 'z-20', 'pt-2') : null;
 
-      processPickerOptions(this, config);
+      processPickerOptions(this, datepicker.config);
       this.viewDate = computeResetViewDate(datepicker);
 
       // set up event listeners
@@ -1796,12 +1803,12 @@ var Datepicker = (function () {
         new YearsView(this, {id: 2, name: 'years', cellClass: 'year', step: 1}),
         new YearsView(this, {id: 3, name: 'decades', cellClass: 'decade', step: 10}),
       ];
-      this.currentView = this.views[config.startView];
+      this.currentView = this.views[datepicker.config.startView];
 
       this.currentView.render();
       this.main.appendChild(this.currentView.element);
-      if (config.container) {
-        config.container.appendChild(this.element);
+      if (datepicker.config.container) {
+        datepicker.config.container.appendChild(this.element);
       } else {
         datepicker.inputField.after(this.element);
       }
@@ -1837,10 +1844,9 @@ var Datepicker = (function () {
           element.removeAttribute('dir');
         }
 
-        element.style.visiblity = 'hidden';
         element.classList.add('active', 'block');
+        element.classList.remove('hidden');
         this.place();
-        element.style.visiblity = '';
 
         if (datepicker.config.disableTouchKeyboard) {
           datepicker.inputField.blur();
@@ -1856,7 +1862,7 @@ var Datepicker = (function () {
       }
       this.datepicker.exitEditMode();
       this.element.classList.remove('active', 'block');
-      this.element.classList.add('hidden');
+      this.element.classList.add('active', 'block', 'hidden');
       this.active = false;
       triggerDatepickerEvent(this.datepicker, 'hide');
     }
@@ -2158,6 +2164,7 @@ var Datepicker = (function () {
       }
     }
     ev.preventDefault();
+    ev.stopPropagation();
   }
 
   function onFocus(datepicker) {
@@ -2503,7 +2510,7 @@ var Datepicker = (function () {
         if (this.inputField.disabled) {
           return;
         }
-        if (!isActiveElement(this.inputField) && !this.config.disableTouchKeyboard) {
+        if (this.inputField !== document.activeElement) {
           this._showing = true;
           this.inputField.focus();
           delete this._showing;
@@ -2711,4 +2718,4 @@ var Datepicker = (function () {
 
   return Datepicker;
 
-})();
+}())
